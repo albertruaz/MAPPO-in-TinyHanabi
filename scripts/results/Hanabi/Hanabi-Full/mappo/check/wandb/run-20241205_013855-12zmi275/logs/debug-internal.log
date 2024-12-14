@@ -1,8 +1,0 @@
-{"time":"2024-12-05T01:38:55.324000468+09:00","level":"INFO","msg":"using version","core version":"0.18.7"}
-{"time":"2024-12-05T01:38:55.324035641+09:00","level":"INFO","msg":"created symlink","path":"/home/swkang/codes/on-policy/onpolicy/scripts/results/Hanabi/Hanabi-Full/mappo/check/wandb/run-20241205_013855-12zmi275/logs/debug-core.log"}
-{"time":"2024-12-05T01:38:55.435542211+09:00","level":"INFO","msg":"created new stream","id":"12zmi275"}
-{"time":"2024-12-05T01:38:55.435603607+09:00","level":"INFO","msg":"stream: started","id":"12zmi275"}
-{"time":"2024-12-05T01:38:55.435676601+09:00","level":"INFO","msg":"handler: started","stream_id":"12zmi275"}
-{"time":"2024-12-05T01:38:55.435728169+09:00","level":"INFO","msg":"sender: started","stream_id":"12zmi275"}
-{"time":"2024-12-05T01:38:55.435750708+09:00","level":"INFO","msg":"writer: Do: started","stream_id":"12zmi275"}
-{"time":"2024-12-05T01:38:55.805728923+09:00","level":"INFO","msg":"Starting system monitor"}

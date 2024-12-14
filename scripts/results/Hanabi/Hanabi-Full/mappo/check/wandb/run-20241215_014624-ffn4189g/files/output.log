@@ -1,3 +1,0 @@
-obs_space:  [[660], [660]]
-share_obs_space:  [[785], [785]]
-act_space:  [Discrete(20), Discrete(20)]
