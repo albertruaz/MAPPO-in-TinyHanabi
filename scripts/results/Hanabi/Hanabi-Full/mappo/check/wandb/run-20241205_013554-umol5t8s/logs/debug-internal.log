@@ -1,0 +1,20 @@
+{"time":"2024-12-05T01:35:54.82435109+09:00","level":"INFO","msg":"using version","core version":"0.18.7"}
+{"time":"2024-12-05T01:35:54.824374158+09:00","level":"INFO","msg":"created symlink","path":"/home/swkang/codes/on-policy/onpolicy/scripts/results/Hanabi/Hanabi-Full/mappo/check/wandb/run-20241205_013554-umol5t8s/logs/debug-core.log"}
+{"time":"2024-12-05T01:35:54.943686026+09:00","level":"INFO","msg":"created new stream","id":"umol5t8s"}
+{"time":"2024-12-05T01:35:54.943753221+09:00","level":"INFO","msg":"stream: started","id":"umol5t8s"}
+{"time":"2024-12-05T01:35:54.943900508+09:00","level":"INFO","msg":"handler: started","stream_id":"umol5t8s"}
+{"time":"2024-12-05T01:35:54.945170347+09:00","level":"INFO","msg":"writer: Do: started","stream_id":"umol5t8s"}
+{"time":"2024-12-05T01:35:54.945178638+09:00","level":"INFO","msg":"sender: started","stream_id":"umol5t8s"}
+{"time":"2024-12-05T01:35:55.20199804+09:00","level":"ERROR","msg":"HTTP error","status":403,"method":"POST","url":"https://api.wandb.ai/graphql"}
+{"time":"2024-12-05T01:35:55.202152617+09:00","level":"ERROR","msg":"sender: upsertRun:","error":"failed to upsert bucket: returned error 403 Forbidden: {\"errors\":[{\"message\":\"permission denied\",\"path\":[\"upsertBucket\"],\"extensions\":{\"code\":\"PERMISSION_ERROR\"}}],\"data\":{\"upsertBucket\":null}}"}
+{"time":"2024-12-05T01:35:55.222189532+09:00","level":"INFO","msg":"stream: closing","id":"umol5t8s"}
+{"time":"2024-12-05T01:35:55.222978028+09:00","level":"ERROR","msg":"sender: upsertConfig: RunRecord is nil"}
+{"time":"2024-12-05T01:35:55.223374434+09:00","level":"WARN","msg":"No requirements.txt found, not creating job artifact. See https://docs.wandb.ai/guides/launch/create-job"}
+{"time":"2024-12-05T01:35:55.223390623+09:00","level":"INFO","msg":"sender: sendDefer: no job artifact to save"}
+{"time":"2024-12-05T01:35:55.463170855+09:00","level":"ERROR","msg":"HTTP error","status":404,"method":"POST","url":"https://api.wandb.ai/graphql"}
+{"time":"2024-12-05T01:35:55.463258062+09:00","level":"ERROR","msg":"runfiles: CreateRunFiles returned error: returned error 404 Not Found: {\"errors\":[{\"message\":\"run Hanabi/umol5t8s not found during createRunFiles\",\"path\":[\"createRunFiles\"]}],\"data\":{\"createRunFiles\":null}}"}
+{"time":"2024-12-05T01:35:55.469195922+09:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-12-05T01:35:55.469333171+09:00","level":"INFO","msg":"handler: closed","stream_id":"umol5t8s"}
+{"time":"2024-12-05T01:35:55.469349107+09:00","level":"INFO","msg":"writer: Close: closed","stream_id":"umol5t8s"}
+{"time":"2024-12-05T01:35:55.469387061+09:00","level":"INFO","msg":"sender: closed","stream_id":"umol5t8s"}
+{"time":"2024-12-05T01:35:55.470260952+09:00","level":"INFO","msg":"stream: closed","id":"umol5t8s"}

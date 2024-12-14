@@ -1,0 +1,25 @@
+2024-12-05 01:38:55,314 INFO    MainThread:313525 [wandb_setup.py:_flush():79] Current SDK version is 0.18.7
+2024-12-05 01:38:55,314 INFO    MainThread:313525 [wandb_setup.py:_flush():79] Configure stats pid to 313525
+2024-12-05 01:38:55,314 INFO    MainThread:313525 [wandb_setup.py:_flush():79] Loading settings from /home/swkang/.config/wandb/settings
+2024-12-05 01:38:55,314 INFO    MainThread:313525 [wandb_setup.py:_flush():79] Loading settings from /home/swkang/codes/on-policy/onpolicy/scripts/wandb/settings
+2024-12-05 01:38:55,314 INFO    MainThread:313525 [wandb_setup.py:_flush():79] Loading settings from environment variables: {}
+2024-12-05 01:38:55,314 INFO    MainThread:313525 [wandb_setup.py:_flush():79] Applying setup settings: {'mode': None, '_disable_service': None}
+2024-12-05 01:38:55,314 INFO    MainThread:313525 [wandb_setup.py:_flush():79] Inferring run settings from compute environment: {'program_relpath': 'onpolicy/scripts/train/train_hanabi_forward.py', 'program_abspath': '/home/swkang/codes/on-policy/onpolicy/scripts/train/train_hanabi_forward.py', 'program': 'train/train_hanabi_forward.py'}
+2024-12-05 01:38:55,314 INFO    MainThread:313525 [wandb_setup.py:_flush():79] Applying login settings: {}
+2024-12-05 01:38:55,315 INFO    MainThread:313525 [wandb_init.py:_log_setup():533] Logging user logs to /home/swkang/codes/on-policy/onpolicy/scripts/results/Hanabi/Hanabi-Full/mappo/check/wandb/run-20241205_013855-12zmi275/logs/debug.log
+2024-12-05 01:38:55,315 INFO    MainThread:313525 [wandb_init.py:_log_setup():534] Logging internal logs to /home/swkang/codes/on-policy/onpolicy/scripts/results/Hanabi/Hanabi-Full/mappo/check/wandb/run-20241205_013855-12zmi275/logs/debug-internal.log
+2024-12-05 01:38:55,315 INFO    MainThread:313525 [wandb_init.py:init():619] calling init triggers
+2024-12-05 01:38:55,315 INFO    MainThread:313525 [wandb_init.py:init():627] wandb.init called with sweep_config: {}
+config: {'algorithm_name': 'mappo', 'experiment_name': 'check', 'seed': 1, 'cuda': True, 'cuda_deterministic': True, 'n_training_threads': 1, 'n_rollout_threads': 1000, 'n_eval_rollout_threads': 1, 'n_render_rollout_threads': 1, 'num_env_steps': 10000000000000, 'user_name': 'marl', 'use_wandb': True, 'env_name': 'Hanabi', 'use_obs_instead_of_state': False, 'episode_length': 100, 'share_policy': True, 'use_centralized_V': True, 'stacked_frames': 1, 'use_stacked_frames': False, 'hidden_size': 512, 'layer_N': 2, 'use_ReLU': True, 'use_popart': False, 'use_valuenorm': True, 'use_feature_normalization': True, 'use_orthogonal': True, 'gain': 0.01, 'use_naive_recurrent_policy': False, 'use_recurrent_policy': False, 'recurrent_N': 1, 'data_chunk_length': 10, 'lr': 0.0007, 'critic_lr': 0.001, 'opti_eps': 1e-05, 'weight_decay': 0, 'kl_threshold': 0.01, 'ls_step': 10, 'accept_ratio': 0.5, 'ppo_epoch': 15, 'use_clipped_value_loss': True, 'clip_param': 0.2, 'num_mini_batch': 1, 'entropy_coef': 0.015, 'value_loss_coef': 1, 'use_max_grad_norm': True, 'max_grad_norm': 10.0, 'use_gae': True, 'gamma': 0.99, 'gae_lambda': 0.95, 'use_proper_time_limits': False, 'use_huber_loss': True, 'use_value_active_masks': True, 'use_policy_active_masks': True, 'huber_delta': 10.0, 'use_linear_lr_decay': False, 'save_interval': 1, 'log_interval': 5, 'use_eval': False, 'eval_interval': 25, 'eval_episodes': 32, 'save_gifs': False, 'use_render': False, 'render_episodes': 5, 'ifi': 0.1, 'model_dir': None, 'encode_state': False, 'n_block': 1, 'n_embd': 64, 'n_head': 1, 'dec_actor': False, 'share_actor': False, 'train_maps': None, 'eval_maps': None, 'hanabi_name': 'Hanabi-Full', 'num_agents': 2}
+2024-12-05 01:38:55,315 INFO    MainThread:313525 [wandb_init.py:init():669] starting backend
+2024-12-05 01:38:55,316 INFO    MainThread:313525 [wandb_init.py:init():673] sending inform_init request
+2024-12-05 01:38:55,319 INFO    MainThread:313525 [backend.py:_multiprocessing_setup():106] multiprocessing start_methods=fork,spawn,forkserver, using: spawn
+2024-12-05 01:38:55,320 INFO    MainThread:313525 [wandb_init.py:init():686] backend started and connected
+2024-12-05 01:38:55,326 INFO    MainThread:313525 [wandb_init.py:init():781] updated telemetry
+2024-12-05 01:38:55,351 INFO    MainThread:313525 [wandb_init.py:init():814] communicating run to backend with 90.0 second timeout
+2024-12-05 01:38:55,790 INFO    MainThread:313525 [wandb_init.py:init():867] starting run threads in backend
+2024-12-05 01:38:56,233 INFO    MainThread:313525 [wandb_run.py:_console_start():2456] atexit reg
+2024-12-05 01:38:56,234 INFO    MainThread:313525 [wandb_run.py:_redirect():2305] redirect: wrap_raw
+2024-12-05 01:38:56,234 INFO    MainThread:313525 [wandb_run.py:_redirect():2370] Wrapping output streams.
+2024-12-05 01:38:56,235 INFO    MainThread:313525 [wandb_run.py:_redirect():2395] Redirects installed.
+2024-12-05 01:38:56,241 INFO    MainThread:313525 [wandb_init.py:init():911] run started, returning control to user process
