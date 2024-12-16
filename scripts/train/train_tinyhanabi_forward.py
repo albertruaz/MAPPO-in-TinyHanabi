@@ -8,25 +8,24 @@ import numpy as np
 from pathlib import Path
 import torch
 from onpolicy.config import get_config
+# TinyHanabiMatrixEnv를 가져올 때 새로운 파일을 import
 from onpolicy.envs.tinyhanabi.Tiny_Hanabi_Env import TinyHanabiEnv
 from onpolicy.envs.env_wrappers import ChooseSubprocVecEnv, ChooseDummyVecEnv
 
-"""Train script for Hanabi."""
+"""Train script for TinyHanabi (Matrix version)."""
 
 def make_train_env(all_args):
     def get_env_fn(rank):
         def init_env():
-            if all_args.env_name == "Hanabi":
-                assert all_args.num_agents > 1 and all_args.num_agents < 6, (
-                    "num_agents can be only between 2-5.")
+            if all_args.env_name == "TinyHanabi":
+                assert all_args.num_agents == 2, (
+                    "TinyHanabiMatrixEnv example only supports 2 players")
                 env = TinyHanabiEnv(all_args, (all_args.seed + rank * 1000))
             else:
-                print("Can not support the " +
-                      all_args.env_name + "environment.")
+                print("Cannot support the " + all_args.env_name + " environment.")
                 raise NotImplementedError
             env.seed(all_args.seed + rank * 1000)
             return env
-
         return init_env
 
     if all_args.n_rollout_threads == 1:
@@ -34,22 +33,18 @@ def make_train_env(all_args):
     else:
         return ChooseSubprocVecEnv([get_env_fn(i) for i in range(all_args.n_rollout_threads)])
 
-
 def make_eval_env(all_args):
     def get_env_fn(rank):
         def init_env():
-            if all_args.env_name == "Hanabi":
-                assert all_args.num_agents > 1 and all_args.num_agents < 6, (
-                    "num_agents can be only between 2-5.")
-                env = TinyHanabiEnv(
-                    all_args, (all_args.seed * 50000 + rank * 10000))
+            if all_args.env_name == "TinyHanabi":
+                assert all_args.num_agents == 2, (
+                    "TinyHanabiMatrixEnv example only supports 2 players")
+                env = TinyHanabiEnv(all_args, (all_args.seed * 50000 + rank * 10000))
             else:
-                print("Can not support the " +
-                      all_args.env_name + "environment.")
+                print("Cannot support the " + all_args.env_name + " environment.")
                 raise NotImplementedError
             env.seed(all_args.seed * 50000 + rank * 10000)
             return env
-
         return init_env
 
     if all_args.n_eval_rollout_threads == 1:
@@ -60,12 +55,11 @@ def make_eval_env(all_args):
 
 def parse_args(args, parser):
     parser.add_argument('--hanabi_name', type=str,
-                        default='Hanabi-Very-Small', help="Which env to run on")
+                        default='TinyHanabi-Example', help="Which tiny hanabi variant to run on")
     parser.add_argument('--num_agents', type=int,
                         default=2, help="number of players")
 
     all_args = parser.parse_known_args(args)[0]
-
     return all_args
 
 
@@ -74,15 +68,15 @@ def main(args):
     all_args = parse_args(args, parser)
 
     if all_args.algorithm_name == "rmappo":
-        print("u are choosing to use rmappo, we set use_recurrent_policy to be True")
+        print("u are choosing to use rmappo, we set use_recurrent_policy to True")
         all_args.use_recurrent_policy = True
         all_args.use_naive_recurrent_policy = False
     elif all_args.algorithm_name == "mappo":
-        print("u are choosing to use mappo, we set use_recurrent_policy & use_naive_recurrent_policy to be False")
+        print("u are choosing to use mappo, we set use_recurrent_policy & use_naive_recurrent_policy to False")
         all_args.use_recurrent_policy = False 
         all_args.use_naive_recurrent_policy = False
     elif all_args.algorithm_name == "ippo":
-        print("u are choosing to use ippo, we set use_centralized_V to be False")
+        print("u are choosing to use ippo, we set use_centralized_V to False")
         all_args.use_centralized_V = False
     else:
         raise NotImplementedError
@@ -110,7 +104,6 @@ def main(args):
     if all_args.use_wandb:
         run = wandb.init(config=all_args,
                          project=all_args.env_name,
-                        #  entity=all_args.user_name,
                          notes=socket.gethostname(),
                          name=str(all_args.algorithm_name) + "_" +
                               str(all_args.experiment_name) +
@@ -133,8 +126,10 @@ def main(args):
         if not run_dir.exists():
             os.makedirs(str(run_dir))
 
+    user_name = getattr(all_args, 'user_name', 'user')  # if user_name not defined
+
     setproctitle.setproctitle(str(all_args.algorithm_name) + "-" + str(
-        all_args.env_name) + "-" + str(all_args.experiment_name) + "@" + str(all_args.user_name))
+        all_args.env_name) + "-" + str(all_args.experiment_name) + "@" + str(user_name))
 
     # seed
     torch.manual_seed(all_args.seed)
@@ -143,12 +138,12 @@ def main(args):
 
     # env init
     envs = make_train_env(all_args)
-    eval_envs = make_eval_env(all_args) if all_args.use_eval else None
+    eval_envs = make_eval_env(all_args) if getattr(all_args, 'use_eval', False) else None
     num_agents = all_args.num_agents
 
     config = {
         "all_args": all_args,
-        "envs": envs,
+        "envs": envs,step
         "eval_envs": eval_envs,
         "num_agents": num_agents,
         "device": device,
@@ -156,17 +151,17 @@ def main(args):
     }
 
     # run experiments
-    if all_args.share_policy:
-        from onpolicy.runner.shared.hanabi_runner_forward import HanabiRunner as Runner
+    if getattr(all_args, 'share_policy', False):
+        from onpolicy.runner.shared.tinyhanabi_runner_forward import TinyHanabiRunner as Runner
     else:
-        from onpolicy.runner.separated.hanabi_runner_forward import HanabiRunner as Runner
+        from onpolicy.runner.separated.tinyhanabi_runner_forward import TinyHanabiRunner as Runner
 
     runner = Runner(config)
     runner.run()
 
     # post process
     envs.close()
-    if all_args.use_eval and eval_envs is not envs:
+    if getattr(all_args, 'use_eval', False) and eval_envs is not envs:
         eval_envs.close()
 
     if all_args.use_wandb:

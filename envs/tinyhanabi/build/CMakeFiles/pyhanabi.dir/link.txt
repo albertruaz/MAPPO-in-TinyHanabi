@@ -1,1 +1,0 @@
-/usr/bin/c++ -fPIC -O2 -std=c++11 -Wall -Wextra -fPIC -Wno-sign-compare -shared -Wl,-soname,libpyhanabi.so -o /home/swkang/codes/on-policy/onpolicy/envs/hanabi/libpyhanabi.so CMakeFiles/pyhanabi.dir/pyhanabi.cc.o  hanabi_lib/libhanabi.a 
