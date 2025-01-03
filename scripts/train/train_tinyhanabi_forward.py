@@ -15,30 +15,31 @@ from onpolicy.envs.env_wrappers import ChooseSubprocVecEnv, ChooseDummyVecEnv
 """Train script for TinyHanabi (Matrix version)."""
 
 def make_train_env(all_args):
-    def get_env_fn(rank):
-        def init_env():
-            if all_args.env_name == "TinyHanabi":
-                assert all_args.num_agents == 2, (
-                    "TinyHanabiMatrixEnv example only supports 2 players")
-                env = TinyHanabiEnv(all_args, (all_args.seed + rank * 1000))
-            else:
-                print("Cannot support the " + all_args.env_name + " environment.")
-                raise NotImplementedError
-            env.seed(all_args.seed + rank * 1000)
-            return env
-        return init_env
+    env = TinyHanabiEnv(all_args, all_args.seed)
+    return env 
 
-    if all_args.n_rollout_threads == 1:
-        return ChooseDummyVecEnv([get_env_fn(0)])
-    else:
-        return ChooseSubprocVecEnv([get_env_fn(i) for i in range(all_args.n_rollout_threads)])
+# def make_train_env(all_args):
+#     def get_env_fn(rank):
+#         def init_env():
+#             if all_args.env_name == "TinyHanabi":
+#                 env = TinyHanabiEnv(all_args, (all_args.seed + rank * 1000))
+#             else:
+#                 print("env_name_error")
+#                 raise NotImplementedError
+#             env.seed(all_args.seed + rank * 1000)
+#             return env
+#         return init_env
+
+#     if all_args.n_rollout_threads == 1:
+#         return ChooseDummyVecEnv([get_env_fn(0)])
+#     else:
+#         return ChooseSubprocVecEnv([get_env_fn(i) for i in range(all_args.n_rollout_threads)])
+
 
 def make_eval_env(all_args):
     def get_env_fn(rank):
         def init_env():
             if all_args.env_name == "TinyHanabi":
-                assert all_args.num_agents == 2, (
-                    "TinyHanabiMatrixEnv example only supports 2 players")
                 env = TinyHanabiEnv(all_args, (all_args.seed * 50000 + rank * 10000))
             else:
                 print("Cannot support the " + all_args.env_name + " environment.")
@@ -56,9 +57,6 @@ def make_eval_env(all_args):
 def parse_args(args, parser):
     parser.add_argument('--hanabi_name', type=str,
                         default='TinyHanabi-Example', help="Which tiny hanabi variant to run on")
-    parser.add_argument('--num_agents', type=int,
-                        default=2, help="number of players")
-
     all_args = parser.parse_known_args(args)[0]
     return all_args
 
@@ -139,19 +137,18 @@ def main(args):
     # env init
     envs = make_train_env(all_args)
     eval_envs = make_eval_env(all_args) if getattr(all_args, 'use_eval', False) else None
-    num_agents = all_args.num_agents
 
     config = {
         "all_args": all_args,
-        "envs": envs,step
+        "envs": envs,
         "eval_envs": eval_envs,
-        "num_agents": num_agents,
+        "num_agents": 2,
         "device": device,
         "run_dir": run_dir
     }
 
     # run experiments
-    if getattr(all_args, 'share_policy', False):
+    if getattr(all_args, 'share_policy', False): #
         from onpolicy.runner.shared.tinyhanabi_runner_forward import TinyHanabiRunner as Runner
     else:
         from onpolicy.runner.separated.tinyhanabi_runner_forward import TinyHanabiRunner as Runner
