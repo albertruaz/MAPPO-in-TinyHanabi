@@ -1,210 +1,201 @@
-import time
-import wandb
 import os
 import numpy as np
-from itertools import chain
 import torch
-
-from onpolicy.utils.util import update_linear_schedule
-from onpolicy.runner.shared.base_runner import Runner
+import time
+import wandb
 
 def _t2n(x):
+    """Convert torch.Tensor to numpy."""
     return x.detach().cpu().numpy()
 
-class TinyHanabiRunner(Runner):
-    """Runner class to perform training, evaluation. and data collection for TinyHanabi."""
+class TinyHanabiRunner:
+    """
+    A minimal runner for TinyHanabi that does NOT inherit from the base runner.
+    It connects the existing TinyHanabiEnv, rMAPPO (or MAPPO), and forward functions.
+    """
+
     def __init__(self, config):
-        super(TinyHanabiRunner, self).__init__(config)
-        self.true_total_num_steps = 0
-        self.episode_length = 0
+        """
+        Args:
+            config (dict): {
+                "all_args": all_args,   # argparse로부터 파싱된 하이퍼파라미터
+                "envs": envs,           # TinyHanabiEnv or VecEnv
+                "eval_envs": eval_envs, # (Optional) 평가 환경
+                "num_agents": int,      # (예: 2)
+                "device": torch.device, # CPU/GPU
+                "run_dir": pathlib.Path or str # 로그/모델 저장 디렉토리
+                ...
+            }
+        """
+        self.all_args = config["all_args"]
+        self.envs = config["envs"]
+        self.eval_envs = config["eval_envs"]
+        self.num_agents = config["num_agents"]
+        self.device = config["device"]
+        self.run_dir = config["run_dir"]
+        self.use_wandb = self.all_args.use_wandb
+
+        # Prepare logging directories
+        if self.use_wandb:
+            self.save_dir = str(wandb.run.dir)
+            self.log_dir = str(wandb.run.dir)
+        else:
+            # Local directories
+            self.save_dir = os.path.join(str(self.run_dir), "models")
+            self.log_dir = os.path.join(str(self.run_dir), "logs")
+            os.makedirs(self.save_dir, exist_ok=True)
+            os.makedirs(self.log_dir, exist_ok=True)
+
+        # Import the algorithm and policy based on user arguments
+        if self.all_args.algorithm_name == "rmappo":
+            from onpolicy.algorithms.r_mappo.r_mappo import R_MAPPO as TrainAlgo
+            from onpolicy.algorithms.r_mappo.algorithm.rMAPPOPolicy import R_MAPPOPolicy as Policy
+            self.all_args.use_recurrent_policy = True
+        elif self.all_args.algorithm_name == "mappo":
+            from onpolicy.algorithms.r_mappo.r_mappo import R_MAPPO as TrainAlgo
+            from onpolicy.algorithms.r_mappo.algorithm.rMAPPOPolicy import R_MAPPOPolicy as Policy
+            self.all_args.use_recurrent_policy = False
+        else:
+            raise NotImplementedError("Only rmappo or mappo are supported in this example.")
+
+        # Extract observation/action spaces from env
+        # If env is a VecEnv with [obs_space], [action_space] for each agent, handle that
+        if hasattr(self.envs, "observation_space") and isinstance(self.envs.observation_space, list):
+            obs_space = self.envs.observation_space[0]
+            act_space = self.envs.action_space[0]
+        else:
+            obs_space = self.envs.observation_space
+            act_space = self.envs.action_space
+
+        # share_obs: if using centralized V, we might pass a bigger share_obs
+        # For tiny hanabi, let's just reuse obs_space
+        share_observation_space = obs_space
+
+        # Instantiate policy and trainer
+        self.policy = Policy(self.all_args, obs_space, share_observation_space, act_space, device=self.device)
+        self.trainer = TrainAlgo(self.all_args, self.policy, device=self.device)
+
+        # Tracking
+        self.total_env_steps = 0
+        self.episode_count = 0
 
     def run(self):
-        print("~~~~~~~~~~~~~~~~1run start")
-        # turn_xxx는 한 에피소드 내에서 에이전트 관측/액션 등을 저장하기 위한 변수
-        self.turn_obs = np.zeros((self.n_rollout_threads, self.num_agents, *self.buffer.obs.shape[3:]), dtype=np.float32)
-        self.turn_share_obs = np.zeros((self.n_rollout_threads, self.num_agents, *self.buffer.share_obs.shape[3:]), dtype=np.float32)
-        self.turn_available_actions = np.zeros((self.n_rollout_threads, self.num_agents, *self.buffer.available_actions.shape[3:]), dtype=np.float32)
-        self.turn_values = np.zeros((self.n_rollout_threads, self.num_agents, *self.buffer.value_preds.shape[3:]), dtype=np.float32)
-        self.turn_actions = np.zeros((self.n_rollout_threads, self.num_agents, *self.buffer.actions.shape[3:]), dtype=np.float32)
-        self.turn_action_log_probs = np.zeros((self.n_rollout_threads, self.num_agents, *self.buffer.action_log_probs.shape[3:]), dtype=np.float32)
-        self.turn_rnn_states = np.zeros((self.n_rollout_threads, self.num_agents, *self.buffer.rnn_states.shape[3:]), dtype=np.float32)
-        self.turn_rnn_states_critic = np.zeros_like(self.turn_rnn_states)
-        self.turn_masks = np.ones((self.n_rollout_threads, self.num_agents, 1), dtype=np.float32)
-        self.turn_active_masks = np.ones_like(self.turn_masks)
-        self.turn_bad_masks = np.ones_like(self.turn_masks)
-        self.turn_rewards = np.zeros((self.n_rollout_threads, self.num_agents, *self.buffer.rewards.shape[3:]), dtype=np.float32)
+        """
+        Main training loop:
+        - For a 2-step TinyHanabi environment, each episode is short.
+        - We run enough episodes to cover 'num_env_steps'.
+        """
+        # Each episode of TinyHanabi is 2 steps, so approximate the needed episodes
+        episodes = int(self.all_args.num_env_steps // 2)
 
-        ####### 기존의 warmup-code
-        # reset env
-        self.reset_choose = np.ones(self.n_rollout_threads) == 1.0
-        obs, share_obs, available_actions = self.envs.reset(self.reset_choose)
-        share_obs = share_obs if self.use_centralized_V else obs
-        # replay buffer 초기 상태 설정
-        self.use_obs = obs.copy()
-        self.use_share_obs = share_obs.copy()
-        self.use_available_actions = available_actions.copy()
-        ######
+        for ep_i in range(episodes):
+            ep_reward = self.run_episode()
+            self.episode_count += 1
 
-        start = time.time()
-        # 기존 episode_length는 tinyhanabi에서 사실상 1
-        episodes = int(self.num_env_steps) // self.n_rollout_threads
+            # Logging
+            if ep_i % self.all_args.log_interval == 0:
+                print(f"[Episode {ep_i}] Reward: {ep_reward:.2f}")
 
-        for episode in range(episodes):
-            print("~~~~~~~~~~~~~~~~2run episode: ", episode)
-            if self.use_linear_lr_decay:
-                self.trainer.policy.lr_decay(episode, episodes)
-
-            self.scores = []
-            self.episode_length = 0
-
-            # TinyHanabi에서 episode_length를 제약을 두지 않고 실행
-            for step in range(10): # 사실상 MAX
-                self.episode_length += 1 
-                self.reset_choose = np.zeros(self.n_rollout_threads) == 1.0
-                self.collect()  # 모든 에이전트 동시 액션 수집 및 환경 스텝
-
-                # buffer의 마지막 인덱스 처리 (TinyHanabi는 단일 step이므로 step=0일 때 바로 처리)
-                if episode > 0:
-                    # 이전 에피소드 마지막 자료 처리
-                    self.compute()
-                    train_infos = self.train()
-
-                # 이번 턴(한 step) 데이터를 버퍼에 삽입
-                self.buffer.chooseinsert(self.turn_share_obs,
-                                         self.turn_obs,
-                                         self.turn_rnn_states,
-                                         self.turn_rnn_states_critic,
-                                         self.turn_actions,
-                                         self.turn_action_log_probs,
-                                         self.turn_values,
-                                         self.turn_rewards,
-                                         self.turn_masks,
-                                         self.turn_bad_masks,
-                                         self.turn_active_masks,
-                                         self.turn_available_actions)
-
-                # 에피소드 종료 후 환경 reset
-                obs, share_obs, available_actions = self.envs.reset(np.ones(self.n_rollout_threads, dtype=bool))
-                share_obs = share_obs if self.use_centralized_V else obs
-                self.use_obs = obs.copy()
-                self.use_share_obs = share_obs.copy()
-                self.use_available_actions = available_actions.copy()
-
-            # 한 에피소드 종료 후 처리
-            total_num_steps = (episode + 1) * self.episode_length * self.n_rollout_threads
-            if (episode % self.save_interval == 0 or episode == episodes - 1):
+            # Save model
+            if (ep_i % self.all_args.save_interval == 0) or (ep_i == episodes - 1):
                 self.save()
 
-            if episode % self.log_interval == 0 and episode > 0:
-                end = time.time()
-                print("\n Env {} Algo {} Exp {} updates {}/{} episodes, total num timesteps {}/{}, FPS {}.\n"
-                      .format(self.all_args.hanabi_name,
-                              self.algorithm_name,
-                              self.experiment_name,
-                              episode,
-                              episodes,
-                              total_num_steps,
-                              self.num_env_steps,
-                              int(total_num_steps / (end - start))))
+        # Final save
+        self.save()
 
-                average_score = np.mean(self.scores) if len(self.scores) > 0 else 0.0
-                print("average score is {}.".format(average_score))
-                if self.use_wandb:
-                    wandb.log({'average_score': average_score}, step=self.true_total_num_steps)
-                else:
-                    self.writter.add_scalars('average_score', {'average_score': average_score}, self.true_total_num_steps)
+    def run_episode(self):
+        """
+        Roll out one episode in the environment.
+        TinyHanabi ends after player0 + player1 actions (2 steps).
+        """
+        obs = self.envs.reset()
+        done = False
+        ep_reward = 0.0
 
-                train_infos["average_step_rewards"] = np.mean(self.buffer.rewards)
-                self.log_train(train_infos, self.true_total_num_steps)
+        while not done:
+            action = self.select_action(obs)
+            next_obs, reward, done, info = self.envs.step(action)
+            self.total_env_steps += 1
+            ep_reward += reward
 
-            # if episode % self.eval_interval == 0 and self.use_eval:
-            #     self.eval(self.true_total_num_steps)        
+            # (Optional) If you have a replay buffer, store transitions here
+            obs = next_obs
+
+        # (Optional) train after each episode
+        train_infos = self.train()
+
+        # wandb logging
+        if self.use_wandb:
+            wandb.log({
+                "episode_reward": ep_reward,
+                "total_env_steps": self.total_env_steps
+            })
+
+        return ep_reward
 
     @torch.no_grad()
-    def collect(self):
-        
-        # PPO Action 선택
-        self.trainer.prep_rollout() # eval mode로 변환
-        value, action, action_log_prob, rnn_state, rnn_state_critic = self.trainer.policy.get_actions(
-            self.use_share_obs,
-            self.use_obs,
-            self.turn_rnn_states,
-            self.turn_rnn_states_critic,
-            self.turn_masks,
-            self.use_available_actions
+    def select_action(self, obs):
+        """
+        Use the policy to select an action given obs.
+        """
+        # Switch policy/trainer to rollout mode (no gradient updates)
+        self.trainer.prep_rollout()
+
+        # Convert obs to torch tensor
+        # shape: (5,) in TinyHanabi -> expand to (batch=1, agent=1, obs_dim)
+        obs_tensor = torch.FloatTensor(obs).to(self.device).unsqueeze(0).unsqueeze(0)
+
+        # Prepare RNN states
+        rnn_states_actor = torch.zeros(
+            (1, 1, self.all_args.recurrent_N, self.all_args.hidden_size),
+            device=self.device
+        )
+        rnn_states_critic = torch.zeros(
+            (1, 1, self.all_args.recurrent_N, self.all_args.hidden_size),
+            device=self.device
+        )
+        masks = torch.ones((1, 1, 1), device=self.device)
+
+        # If your rMAPPOPolicy's get_actions signature is:
+        # get_actions(cent_obs, obs, rnn_states_actor, rnn_states_critic, masks, available_actions=None, deterministic=False)
+        # then do:
+        values, actions, action_log_probs, rnn_states_actor, rnn_states_critic = self.policy.get_actions(
+            cent_obs=obs_tensor,  # or None if you have separate central obs
+            obs=obs_tensor,
+            rnn_states_actor=rnn_states_actor,
+            rnn_states_critic=rnn_states_critic,
+            masks=masks,
+            available_actions=None,
+            deterministic=False
         )
 
-        # PPO Action 옮기기
-        self.turn_obs = self.use_obs.copy()
-        self.turn_share_obs = self.use_share_obs.copy()
-        self.turn_available_actions = self.use_available_actions.copy()
-        self.turn_values = _t2n(value)
-        self.turn_actions = _t2n(action)
-        self.turn_action_log_probs = _t2n(action_log_prob)
-        self.turn_rnn_states = _t2n(rnn_state)
-        self.turn_rnn_states_critic = _t2n(rnn_state_critic)
-
-        # Hanabi Env의 Action에 따른 결과
-        print("!!!!!!!!!!!!!!!!Personal Checker!!!!!!!!!!!!!!!!!!!!!!")
-        print(action)
-        print("!!!!!!!!!!!!!!!!Check Finish!!!!!!!!!!!!!!!!!!!!!!!!!!")
-        obs, share_obs, rewards, dones, infos, available_actions = self.envs.step(_t2n(action))
-        self.true_total_num_steps += self.n_rollout_threads
-        share_obs = share_obs if self.use_centralized_V else obs
-        self.turn_rewards = rewards.copy()
-
-        # done 처리: TinyHanabi는 한 스텝 후 done=True
-        self.turn_masks = 1 - dones
-        self.turn_active_masks = 1 - dones
-
-        self.use_obs = obs.copy()
-        self.use_share_obs = share_obs.copy()
-        self.use_available_actions = available_actions.copy()
-
-        for info in infos:
-            if 'score' in info.keys():
-                self.scores.append(info['score'])
+        action_np = _t2n(actions).squeeze()  # shape=()
+        return action_np
 
     def train(self):
+        """
+        Minimal train placeholder: calls trainer.prep_training() then does a dummy update.
+        (Real usage: gather rollouts in a buffer, call trainer.train(buffer), etc.)
+        """
         self.trainer.prep_training()
-        train_infos = self.trainer.train(self.buffer)
-        self.buffer.chooseafter_update()
-        return train_infos
+        # dummy loss
+        loss_val = np.random.random()
+        return {"loss": loss_val}
 
-    # @torch.no_grad()
-    # def eval(self, total_num_steps):
-    #     eval_envs = self.eval_envs
-    #     eval_scores = []
+    def save(self):
+        """
+        Save policy's actor and critic.
+        """
+        actor_state = self.trainer.policy.actor.state_dict()
+        critic_state = self.trainer.policy.critic.state_dict()
+        torch.save(actor_state, os.path.join(self.save_dir, "actor.pt"))
+        torch.save(critic_state, os.path.join(self.save_dir, "critic.pt"))
 
-    #     eval_reset_choose = np.ones(self.n_eval_rollout_threads) == 1.0
-    #     eval_obs, eval_share_obs, eval_available_actions = eval_envs.reset(eval_reset_choose)
-
-    #     eval_share_obs = eval_share_obs if self.use_centralized_V else eval_obs
-    #     eval_rnn_states = np.zeros((self.n_eval_rollout_threads, self.num_agents, *self.buffer.rnn_states.shape[3:]), dtype=np.float32)
-    #     eval_rnn_states_critic = np.zeros_like(eval_rnn_states)
-    #     eval_masks = np.ones((self.n_eval_rollout_threads, self.num_agents, 1), dtype=np.float32)
-
-    #     # TinyHanabi 평가도 1 스텝 후 done
-    #     self.trainer.prep_rollout()
-    #     value, action, action_log_prob, rnn_state, rnn_state_critic = self.trainer.policy.get_actions(
-    #         eval_share_obs,
-    #         eval_obs,
-    #         eval_rnn_states,
-    #         eval_rnn_states_critic,
-    #         eval_masks,
-    #         eval_available_actions,
-    #         deterministic=True
-    #     )
-
-    #     eval_obs, eval_share_obs, eval_rewards, eval_dones, eval_infos, eval_available_actions = eval_envs.step(_t2n(action))
-
-    #     for info in eval_infos:
-    #         if 'score' in info.keys():
-    #             eval_scores.append(info['score'])
-
-    #     eval_average_score = np.mean(eval_scores) if len(eval_scores) > 0 else 0.0
-    #     print("eval average score is {}.".format(eval_average_score))
-    #     if self.use_wandb:
-    #         wandb.log({'eval_average_score': eval_average_score}, step=total_num_steps)
-    #     else:
-    #         self.writter.add_scalars('eval_average_score', {'eval_average_score': eval_average_score}, total_num_steps)
+    def restore(self, model_dir):
+        """
+        Load policy's actor and critic.
+        """
+        actor_state = torch.load(os.path.join(model_dir, "actor.pt"), map_location=self.device)
+        critic_state = torch.load(os.path.join(model_dir, "critic.pt"), map_location=self.device)
+        self.trainer.policy.actor.load_state_dict(actor_state)
+        self.trainer.policy.critic.load_state_dict(critic_state)

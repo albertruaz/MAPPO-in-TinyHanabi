@@ -8,15 +8,13 @@ import numpy as np
 from pathlib import Path
 import torch
 from onpolicy.config import get_config
-# TinyHanabiMatrixEnv를 가져올 때 새로운 파일을 import
 from onpolicy.envs.tinyhanabi.Tiny_Hanabi_Env import TinyHanabiEnv
 from onpolicy.envs.env_wrappers import ChooseSubprocVecEnv, ChooseDummyVecEnv
 
-"""Train script for TinyHanabi (Matrix version)."""
 
 def make_train_env(all_args):
     env = TinyHanabiEnv(all_args, all_args.seed)
-    return env 
+    return env
 
 # def make_train_env(all_args):
 #     def get_env_fn(rank):
@@ -34,7 +32,6 @@ def make_train_env(all_args):
 #         return ChooseDummyVecEnv([get_env_fn(0)])
 #     else:
 #         return ChooseSubprocVecEnv([get_env_fn(i) for i in range(all_args.n_rollout_threads)])
-
 
 def make_eval_env(all_args):
     def get_env_fn(rank):
