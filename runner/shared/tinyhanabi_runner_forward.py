@@ -6,7 +6,7 @@ from gym.spaces import Discrete, Box
 import wandb
 
 from onpolicy.utils.shared_buffer import SharedReplayBuffer
-
+from onpolicy.utils.valuenorm import ValueNorm
 
 def _t2n(x):
     """Convert torch.Tensor to numpy."""
@@ -39,6 +39,8 @@ class TinyHanabiRunner:
         self.run_dir = config["run_dir"]
         self.use_wandb = self.all_args.use_wandb
         self.total_reward = 0
+        self.value_normalizer = ValueNorm(input_shape=(1,), device=self.device)
+
         if self.use_wandb:
             self.save_dir = str(wandb.run.dir)
             self.log_dir = str(wandb.run.dir)
@@ -95,14 +97,15 @@ class TinyHanabiRunner:
             share_obs_space,
             act_space
         )
+        
+        # Add reward history for recent 50 episodes
+        self.recent_rewards = []
+        self.recent_window = 50
     
     def run(self):
         episodes = int(self.all_args.num_env_steps // self.all_args.n_rollout_threads)
         for batch_i in range(episodes):
             batch_reward = self.run_episode(batch_i)
-            
-            # if batch_i % self.all_args.log_interval == 0:
-            #     print(f"[Episode {ep_i}] Reward: {ep_reward:.2f}")
             if (batch_i % self.all_args.save_interval == 0) or (batch_i == episodes - 1):
                 self.save()
 
@@ -145,16 +148,27 @@ class TinyHanabiRunner:
                 rewards=np.array([reward]),
                 masks=np.array([[[0]]], dtype=np.float32)
             )
+            self.buffer.compute_returns(next_value=np.array([reward]), value_normalizer=self.value_normalizer)
+
+            # 3) Save Data
             self.total_reward += reward
             if self.use_wandb:
-                wandb.log({
-                    "1.average_reward": self.total_reward/(batch_i*self.all_args.n_rollout_threads + ep_i + 1),
-                    "2.episode_reward": reward,
-                    f"3.reward when obs{only_obs}": reward 
-                })
-        # self.buffer.compute_returns(next_value=np.array([0]))
-        train_infos = self.train()
+                # Calculate recent 50 average reward
+                self.recent_rewards.append(reward)
+                if len(self.recent_rewards) > self.recent_window:
+                    self.recent_rewards.pop(0)  # Remove oldest reward
+                recent_avg = np.mean(self.recent_rewards)
 
+                wandb.log({
+                    "average_reward": self.total_reward/(batch_i*self.all_args.n_rollout_threads + ep_i + 1),
+                    "recent_50_average_reward": recent_avg,
+                    f"(detail) reward when obs is {only_obs}": reward
+                    # "episode_reward": reward
+                })
+            
+        
+        train_infos = self.train()
+        self.buffer.after_update()
         # wandb logging
         
             

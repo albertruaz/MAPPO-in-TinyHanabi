@@ -10,7 +10,7 @@ import torch
 from onpolicy.config import get_config
 from onpolicy.envs.tinyhanabi.Tiny_Hanabi_Env import TinyHanabiEnv
 from onpolicy.envs.env_wrappers import ChooseSubprocVecEnv, ChooseDummyVecEnv
-
+from datetime import datetime
 
 def make_train_env(all_args):
     env = TinyHanabiEnv(all_args, all_args.seed)
@@ -97,12 +97,13 @@ def main(args):
 
     # wandb
     if all_args.use_wandb:
+        current_time = datetime.now().strftime("%d_%H_%M")
         run = wandb.init(config=all_args,
                          project=all_args.env_name,
                          notes=socket.gethostname(),
                          name=str(all_args.algorithm_name) + "_" +
                               str(all_args.experiment_name) +
-                              "_seed" + str(all_args.seed),
+                              "_at_" + current_time,
                          group=all_args.hanabi_name,
                          dir=str(run_dir),
                          job_type="training",

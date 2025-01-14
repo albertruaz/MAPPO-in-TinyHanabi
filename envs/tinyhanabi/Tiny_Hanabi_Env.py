@@ -78,11 +78,6 @@ class TinyHanabiEnv(gym.Env):
         return self._get_obs(self.current_player), self.obs_for_players
 
     def _get_obs(self, player_id):
-        """
-        Returns the observation for the requested player_id.
-        Player 0: shape (2,). One-hot.
-        Player 1: shape (5,). (2,) one-hot + (3,) one-hot of player0's action.
-        """
         full_obs = np.zeros(10, dtype=np.float32)
 
         if player_id == 0:
@@ -90,13 +85,13 @@ class TinyHanabiEnv(gym.Env):
             obs_val[self.obs_for_players[0]] = 1.0
             full_obs[:2] = obs_val
         else:
-            # obs + act0
             obs_val = np.zeros(2, dtype=np.float32)
             obs_val[self.obs_for_players[1]] = 1.0
             a0_oh = np.zeros(3, dtype=np.float32)
             if self.last_actions[0] is not None:
                 a0_oh[self.last_actions[0]] = 1.0
-            full_obs[2:7] = np.concatenate([obs_val, a0_oh])  # (2,) + (3,) = (5,)
+            full_obs[2:7] = np.concatenate([a0_oh, obs_val])
+        
         return full_obs
 
     def get_full_obs(self):
@@ -113,6 +108,7 @@ class TinyHanabiEnv(gym.Env):
             full_obs[self.last_actions[0]+2] = 1.0
         if self.last_actions[1] is not None:
             full_obs[self.last_actions[1]+7] = 1.0
+            
         return full_obs
     
 
@@ -140,7 +136,4 @@ class TinyHanabiEnv(gym.Env):
             return np.zeros(5, dtype=np.float32), rew, done, info
 
     def close(self):
-        """
-        Close environment if needed. (No-op here.)
-        """
         pass
