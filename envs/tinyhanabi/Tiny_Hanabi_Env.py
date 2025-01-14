@@ -34,7 +34,7 @@ class TinyHanabiEnv(gym.Env):
         self.observation_space = Box(
             low=0.0,
             high=1.0,
-            shape=(5,),
+            shape=(10,),
             dtype=np.float32
         )
 
@@ -75,7 +75,7 @@ class TinyHanabiEnv(gym.Env):
         self.current_player = 0
         self.last_actions = [None, None]
 
-        return self._get_obs(self.current_player)
+        return self._get_obs(self.current_player), self.obs_for_players
 
     def _get_obs(self, player_id):
         """
@@ -83,42 +83,49 @@ class TinyHanabiEnv(gym.Env):
         Player 0: shape (2,). One-hot.
         Player 1: shape (5,). (2,) one-hot + (3,) one-hot of player0's action.
         """
+        full_obs = np.zeros(10, dtype=np.float32)
+
         if player_id == 0:
-            # (2,) one-hot
             obs_val = np.zeros(2, dtype=np.float32)
             obs_val[self.obs_for_players[0]] = 1.0
-
-            # We'll pad to shape (5,) to match environment's observation_space
-            padded_obs = np.zeros(5, dtype=np.float32)
-            padded_obs[:2] = obs_val
-            return padded_obs
+            full_obs[:2] = obs_val
         else:
-            # Player 1 -> shape (5,)
+            # obs + act0
             obs_val = np.zeros(2, dtype=np.float32)
             obs_val[self.obs_for_players[1]] = 1.0
             a0_oh = np.zeros(3, dtype=np.float32)
             if self.last_actions[0] is not None:
                 a0_oh[self.last_actions[0]] = 1.0
+            full_obs[2:7] = np.concatenate([obs_val, a0_oh])  # (2,) + (3,) = (5,)
+        return full_obs
 
-            return np.concatenate([obs_val, a0_oh])  # (2,) + (3,) = (5,)
+    def get_full_obs(self):
+        full_obs = np.zeros(10, dtype=np.float32)
+
+        obs_val1 = np.zeros(2, dtype=np.float32)
+        obs_val1[self.obs_for_players[0]] = 1.0
+        obs_val2 = np.zeros(2, dtype=np.float32)
+        obs_val2[self.obs_for_players[1]] = 1.0
+        full_obs[:2] = obs_val1
+        full_obs[5:7] = obs_val2
+
+        if self.last_actions[0] is not None:
+            full_obs[self.last_actions[0]+2] = 1.0
+        if self.last_actions[1] is not None:
+            full_obs[self.last_actions[1]+7] = 1.0
+        return full_obs
+    
 
     def step(self, action):
-        """
-        Perform a step in the environment for the current player.
-        Returns: (observation, reward, done, info)
-        """
-        # Store the action
+
         self.last_actions[self.current_player] = action
 
         # If we just acted as player 0, switch to player 1
         if self.current_player == 0:
             self.current_player = 1
-            # Reward is 0 for now because we haven't ended the episode
-            # done is False because player 1 hasn't acted yet
             return self._get_obs(self.current_player), 0.0, False, {}
 
         else:
-            # Player 1 just acted, so the episode ends. Let's compute the final reward.
             a0 = self.last_actions[0]
             a1 = self.last_actions[1]
             rew = self.payoff_values[
@@ -130,8 +137,6 @@ class TinyHanabiEnv(gym.Env):
             # Once player1 acts, the game ends
             done = True
             info = {"episode_score": rew}
-
-            # We won't bother with next obs because done=True
             return np.zeros(5, dtype=np.float32), rew, done, info
 
     def close(self):
