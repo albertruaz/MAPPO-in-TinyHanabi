@@ -128,8 +128,8 @@ class TinyHanabiRunner:
                 action_log_probs= self.action_log_probs,
                 value_preds= self.value_preds,
                 actions=action,
-                rewards=np.array([reward]),
-                masks=_t2n(masks)
+                rewards=np.array([0]),
+                masks=np.array([[[1]]], dtype=np.float32)
             )
 
             # 2) agent 2
@@ -148,7 +148,7 @@ class TinyHanabiRunner:
                 rewards=np.array([reward]),
                 masks=np.array([[[0]]], dtype=np.float32)
             )
-            self.buffer.compute_returns(next_value=np.array([reward]), value_normalizer=self.value_normalizer)
+            
 
             # 3) Save Data
             self.total_reward += reward
@@ -166,7 +166,7 @@ class TinyHanabiRunner:
                     # "episode_reward": reward
                 })
             
-        
+        self.buffer.compute_returns(next_value=np.array([0]), value_normalizer=self.value_normalizer)
         train_infos = self.train()
         self.buffer.after_update()
         # wandb logging
@@ -212,8 +212,6 @@ class TinyHanabiRunner:
         self.buffer.after_update()
         return train_info
 
-        return train_info
-
     def save(self):
         """
         Save policy's actor and critic.
@@ -231,3 +229,38 @@ class TinyHanabiRunner:
         critic_state = torch.load(os.path.join(model_dir, "critic.pt"), map_location=self.device)
         self.trainer.policy.actor.load_state_dict(actor_state)
         self.trainer.policy.critic.load_state_dict(critic_state)
+
+    @torch.no_grad()
+    def eval_policy(self, eval_episodes=100):
+        """
+        Evaluate the trained policy over a set number of episodes.
+        """
+        eval_envs = self.eval_envs
+        eval_scores = []
+        
+        for episode in range(eval_episodes):
+            obs, only_obs = eval_envs.reset()
+            done = False
+            total_reward = 0
+
+            masks = torch.ones((1, self.num_agents, 1), device=self.device)
+
+            while not done:
+                # action = self.select_action(obs, self.rnn_states_actor, self.rnn_states_critic, masks)
+                action = self.select_action(obs)
+                obs, reward, done, info = eval_envs.step(action)
+                total_reward += reward
+
+            eval_scores.append(total_reward)
+            # print(f"Episode {episode + 1}: Total Reward: {total_reward}")
+
+            self.total_reward += total_reward
+            wandb.log({
+                "average_reward": self.total_reward/(episode + 1),
+                "reward": total_reward,
+                f"(detail) reward when obs is {only_obs}": total_reward
+                # "episode_reward": reward
+            })
+
+        avg_score = np.mean(eval_scores)
+        print(f"\nAverage Evaluation Reward over {eval_episodes} episodes: {avg_score}")

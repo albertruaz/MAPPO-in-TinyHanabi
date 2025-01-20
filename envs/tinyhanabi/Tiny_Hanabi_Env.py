@@ -1,6 +1,8 @@
 import numpy as np
 from gym.spaces import Discrete, Box
 import gym
+import torch
+import random
 
 class TinyHanabiEnv(gym.Env):
     """
@@ -61,11 +63,18 @@ class TinyHanabiEnv(gym.Env):
         """
         Sets the random seed for NumPy. If no seed is given, defaults to 0.
         """
-        if seed is not None:
-            np.random.seed(seed)
-        else:
-            np.random.seed(0)
-
+        if seed is None:
+            seed = 0
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
+        np.random.seed(seed)
+        random.seed(seed)  # Python의 random 모듈도 설정
+        
+        # torch의 backend 랜덤성도 제어
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+        
     def reset(self):
         """
         Resets the environment by randomly choosing each player's internal state (0 or 1).
@@ -77,21 +86,36 @@ class TinyHanabiEnv(gym.Env):
 
         return self._get_obs(self.current_player), self.obs_for_players
 
-    def _get_obs(self, player_id):
-        full_obs = np.zeros(10, dtype=np.float32)
+    def _get_obs(self, player_id, obs_dim = 5):
+        obs_dim = 10
+        if obs_dim == 10:
+            full_obs = np.zeros(10, dtype=np.float32)
 
-        if player_id == 0:
-            obs_val = np.zeros(2, dtype=np.float32)
-            obs_val[self.obs_for_players[0]] = 1.0
-            full_obs[:2] = obs_val
+            if player_id == 0:
+                obs_val = np.zeros(2, dtype=np.float32)
+                obs_val[self.obs_for_players[0]] = 1.0
+                full_obs[:2] = obs_val
+            else:
+                obs_val = np.zeros(2, dtype=np.float32)
+                obs_val[self.obs_for_players[1]] = 1.0
+                a0_oh = np.zeros(3, dtype=np.float32)
+                if self.last_actions[0] is not None:
+                    a0_oh[self.last_actions[0]] = 1.0
+                full_obs[2:7] = np.concatenate([a0_oh, obs_val])
         else:
-            obs_val = np.zeros(2, dtype=np.float32)
-            obs_val[self.obs_for_players[1]] = 1.0
-            a0_oh = np.zeros(3, dtype=np.float32)
-            if self.last_actions[0] is not None:
-                a0_oh[self.last_actions[0]] = 1.0
-            full_obs[2:7] = np.concatenate([a0_oh, obs_val])
-        
+            full_obs = np.zeros(5, dtype=np.float32)
+            if player_id == 0:
+                obs_val = np.zeros(2, dtype=np.float32)
+                obs_val[self.obs_for_players[0]] = 1.0
+                full_obs[:2] = obs_val
+            else:
+                obs_val = np.zeros(2, dtype=np.float32)
+                obs_val[self.obs_for_players[1]] = 1.0
+                a0_oh = np.zeros(3, dtype=np.float32)
+                if self.last_actions[0] is not None:
+                    a0_oh[self.last_actions[0]] = 1.0
+                full_obs = np.concatenate([obs_val, a0_oh])
+
         return full_obs
 
     def get_full_obs(self):
@@ -137,3 +161,4 @@ class TinyHanabiEnv(gym.Env):
 
     def close(self):
         pass
+

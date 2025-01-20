@@ -15,24 +15,7 @@ from datetime import datetime
 def make_train_env(all_args):
     env = TinyHanabiEnv(all_args, all_args.seed)
     return env
-
-# def make_train_env(all_args):
-#     def get_env_fn(rank):
-#         def init_env():
-#             if all_args.env_name == "TinyHanabi":
-#                 env = TinyHanabiEnv(all_args, (all_args.seed + rank * 1000))
-#             else:
-#                 print("env_name_error")
-#                 raise NotImplementedError
-#             env.seed(all_args.seed + rank * 1000)
-#             return env
-#         return init_env
-
-#     if all_args.n_rollout_threads == 1:
-#         return ChooseDummyVecEnv([get_env_fn(0)])
-#     else:
-#         return ChooseSubprocVecEnv([get_env_fn(i) for i in range(all_args.n_rollout_threads)])
-
+    
 def make_eval_env(all_args):
     def get_env_fn(rank):
         def init_env():
