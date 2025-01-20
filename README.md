@@ -45,3 +45,18 @@ Run 9   | mean: 4.6, variance: 24.83999999999999
 Run 10  | mean: 8.0, variance: 0.0
 Sum     | mean: 7.076, variance: 7.458224000000001
 ```
+## Other
+<div align="center">
+  <table>
+    <tr>
+      <td align="center">
+        <img src="others/train.png" width="300" alt="Training Process">
+        <p>Graph of training process</p>
+      </td>
+      <td align="center">
+        <img src="others/eval.png" width="300" alt="Evaluation Process">
+        <p>Graph of evaluation process</p>
+      </td>
+    </tr>
+  </table>
+</div>
